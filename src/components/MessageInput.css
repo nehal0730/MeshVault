@@ -1,0 +1,71 @@
+.message-input {
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  padding: 1rem;
+}
+
+.message-input-container {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.message-input-field {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 1.5rem;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.message-input-field:focus {
+  border-color: var(--accent-color);
+  background: var(--bg-primary);
+}
+
+.message-input-field:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.message-input-field::placeholder {
+  color: var(--text-secondary);
+}
+
+.message-input-send {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent-color);
+  color: var(--accent-text);
+  cursor: pointer;
+  transition: transform 0.2s, opacity 0.2s;
+  flex-shrink: 0;
+}
+
+.message-input-send:hover:not(:disabled) {
+  transform: scale(1.05);
+}
+
+.message-input-send:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.message-input-send:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.message-input-send svg {
+  width: 18px;
+  height: 18px;
+}
+

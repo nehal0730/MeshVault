@@ -1,34 +1,35 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>P2P WebRTC Mesh Chat</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MeshVault - P2P WebRTC Mesh Chat</title>
+  <!-- Hidden elements for browser.js compatibility -->
+  <style>
+    #username, #saveIdentity, #peers, #msg, #send, #fileInput, #progress, #log {
+      display: none;
+    }
+  </style>
 </head>
 <body>
-
-  <h2>Identity</h2>
+  <!-- Hidden elements for browser.js to attach to -->
   <input id="username" placeholder="Enter username" />
   <button id="saveIdentity">Save</button>
-
-  <hr />
-
-  <h2>Discovered Peers</h2>
   <ul id="peers"></ul>
-
-  <hr />
-
-  <h2>Chat</h2>
   <input id="msg" placeholder="Message" />
   <button id="send">Send</button>
-
-  <hr />
-
-  <h2>File Transfer (Small / Medium Files)</h2>
   <input type="file" id="fileInput" />
-  <br /><br />
   <progress id="progress" value="0" max="100"></progress>
-
   <pre id="log"></pre>
 
-  <script src="browser.js"></script>
+  <!-- React root -->
+  <div id="root"></div>
+
+  <!-- Load browser.js first (networking logic) -->
+  <!-- browser.js now exposes variables to window.__meshVault* for React adapter -->
+  <script src="/browser.js"></script>
+  
+  <!-- React entry point - Vite will handle this -->
+  <script type="module" src="/src/index.jsx"></script>
 </body>
 </html>

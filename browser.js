@@ -116,7 +116,12 @@ async function verifyIdentity(msg) {
 }
 
 /* ========= SIGNALING ========= */
+// Prompt for port immediately when script loads - always ask (don't cache)
 const wsPort = prompt("Enter WS port:");
+if (!wsPort) {
+  console.error("No WebSocket port provided. Connection will fail.");
+  throw new Error("WebSocket port required");
+}
 const ws = new WebSocket(`ws://localhost:${wsPort}`);
 
 ws.onopen = () => {
@@ -133,12 +138,29 @@ const offlinePeers = new Set();
 const seenMessages = new Set();
 const pendingMessages = new Map();
 
+// Expose to window for React adapter (non-invasive, just makes variables accessible)
+if (typeof window !== 'undefined') {
+  window.__meshVaultPeers = peers;
+  window.__meshVaultPeerIdentities = peerIdentities;
+  window.__meshVaultConnections = connections;
+  window.__meshVaultMyId = myId;
+}
+
 const peerList = document.getElementById("peers");
 
 /* ========= FILE STATE ========= */
-let incomingFile = null;
-let incomingChunks = [];
-let receivedSize = 0;
+// let incomingFile = null;
+// let incomingChunks = [];
+// let receivedSize = 0;
+
+/* ========= FILE STATE ========= */
+const incomingFiles = new Map();
+
+// Expose incomingFiles to window for React adapter
+if (typeof window !== 'undefined') {
+  window.__meshVaultIncomingFiles = incomingFiles;
+}
+
 
 /* ========= UI ========= */
 function renderPeers() {
@@ -375,43 +397,120 @@ async function onMessage(e) {
 }
 
 /* ========= DECRYPTED MESSAGE HANDLING ========= */
+// function handleDecryptedMessage(msg, from) {
+//   if (msg.type === "CHAT") {
+//     handleChatMessage(msg);
+//     return;
+//   }
+
+//   if (msg.type === "FILE_META") {
+//     incomingFile = { ...msg, from };
+//     incomingChunks = [];
+//     receivedSize = 0;
+//     log(`📁 Receiving file: ${msg.name}`);
+//     return;
+//   }
+
+//   if (msg.type === "FILE_CHUNK") {
+//     const chunkBuffer = base64ToArrayBuffer(msg.data);
+//     incomingChunks.push(new Uint8Array(chunkBuffer));
+//     receivedSize += chunkBuffer.byteLength;
+//     document.getElementById("progress").value =
+//       Math.floor((receivedSize / incomingFile.size) * 100);
+//     return;
+//   }
+
+//   if (msg.type === "FILE_END") {
+//     const blob = new Blob(incomingChunks, { type: incomingFile.mime });
+//     const url = URL.createObjectURL(blob);
+//     const a = document.createElement("a");
+//     a.href = url;
+//     a.download = incomingFile.name;
+//     a.textContent = `⬇ Download ${incomingFile.name}`;
+//     document.body.appendChild(a);
+//     log(`✅ File received: ${incomingFile.name}`);
+//     document.getElementById("progress").value = 0;
+//     incomingFile = null;
+//     incomingChunks = [];
+//     return;
+//   }
+  
+// }
+
 function handleDecryptedMessage(msg, from) {
+
+  /* ---------- CHAT ---------- */
   if (msg.type === "CHAT") {
     handleChatMessage(msg);
     return;
   }
 
+  /* ---------- FILE META ---------- */
   if (msg.type === "FILE_META") {
-    incomingFile = { ...msg, from };
-    incomingChunks = [];
-    receivedSize = 0;
+    incomingFiles.set(msg.fileId, {
+      meta: msg,
+      chunks: [],
+      receivedSize: 0,
+      from
+    });
+
     log(`📁 Receiving file: ${msg.name}`);
     return;
   }
 
+  /* ---------- FILE CHUNK ---------- */
   if (msg.type === "FILE_CHUNK") {
+    const entry = incomingFiles.get(msg.fileId);
+    if (!entry) {
+      console.warn("⚠️ FILE_CHUNK without META, skipped");
+      return;
+    }
+
     const chunkBuffer = base64ToArrayBuffer(msg.data);
-    incomingChunks.push(new Uint8Array(chunkBuffer));
-    receivedSize += chunkBuffer.byteLength;
+    entry.chunks.push(new Uint8Array(chunkBuffer));
+    entry.receivedSize += chunkBuffer.byteLength;
+
     document.getElementById("progress").value =
-      Math.floor((receivedSize / incomingFile.size) * 100);
+      Math.floor((entry.receivedSize / entry.meta.size) * 100);
     return;
   }
 
+  /* ---------- FILE END ---------- */
   if (msg.type === "FILE_END") {
-    const blob = new Blob(incomingChunks, { type: incomingFile.mime });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = incomingFile.name;
-    a.textContent = `⬇ Download ${incomingFile.name}`;
-    document.body.appendChild(a);
-    log(`✅ File received: ${incomingFile.name}`);
+    const entry = incomingFiles.get(msg.fileId);
+    if (!entry) {
+      console.warn("⚠️ FILE_END without META, ignored");
+      return;
+    }
+
+    // File received - don't create download link here, let React UI handle it
+    // The browserAdapter will handle the UI update
+    log(`✅ File received: ${entry.meta.name} (handled by React UI)`);
+    
+    // Store the blob URL in the entry for React to use
+    const blob = new Blob(entry.chunks, { type: entry.meta.mime });
+    entry.downloadUrl = URL.createObjectURL(blob);
+    entry.downloadReady = true;
+    // Mark for cleanup but don't delete yet - React needs to get the downloadUrl first
+    entry.completed = true;
+
     document.getElementById("progress").value = 0;
-    incomingFile = null;
-    incomingChunks = [];
+    // Don't delete immediately - let React retrieve the downloadUrl first
+    // Clean up after a delay to allow React to fetch it
+    setTimeout(() => {
+      const entryToDelete = incomingFiles.get(msg.fileId);
+      if (entryToDelete && entryToDelete.completed) {
+        incomingFiles.delete(msg.fileId);
+      }
+    }, 5000);
     return;
   }
+}
+
+// Expose functions to window for React adapter
+if (typeof window !== 'undefined') {
+  window.handleDecryptedMessage = handleDecryptedMessage;
+  window.handleChatMessage = handleChatMessage;
 }
 
 // Send encrypted data to a specific peer
@@ -515,6 +614,39 @@ document.getElementById("send").onclick = () => {
 };
 
 /* ========= FILE SEND ========= */
+// document.getElementById("fileInput").onchange = async (e) => {
+//   const file = e.target.files[0];
+//   if (!file || file.size > 20 * 1024 * 1024) {
+//     alert("File too large (max 20 MB)");
+//     return;
+//   }
+
+//   const buffer = await file.arrayBuffer();
+
+//   broadcast(JSON.stringify({
+//     type: "FILE_META",
+//     name: file.name,
+//     size: file.size,
+//     mime: file.type
+//   }));
+
+//   let offset = 0;
+//   while (offset < buffer.byteLength) {
+//     const chunk = buffer.slice(offset, offset + CHUNK_SIZE);
+//     const chunkData = arrayBufferToBase64(chunk);
+//     broadcast(JSON.stringify({
+//       type: "FILE_CHUNK",
+//       data: chunkData
+//     }));
+//     offset += CHUNK_SIZE;
+//     document.getElementById("progress").value =
+//       Math.floor((offset / buffer.byteLength) * 100);
+//     await new Promise(r => setTimeout(r, 1));
+//   }
+
+//   broadcast(JSON.stringify({ type: "FILE_END" }));
+// };
+
 document.getElementById("fileInput").onchange = async (e) => {
   const file = e.target.files[0];
   if (!file || file.size > 20 * 1024 * 1024) {
@@ -523,9 +655,12 @@ document.getElementById("fileInput").onchange = async (e) => {
   }
 
   const buffer = await file.arrayBuffer();
+  const fileId = crypto.randomUUID();
 
+  // Send META first
   broadcast(JSON.stringify({
     type: "FILE_META",
+    fileId,
     name: file.name,
     size: file.size,
     mime: file.type
@@ -534,18 +669,26 @@ document.getElementById("fileInput").onchange = async (e) => {
   let offset = 0;
   while (offset < buffer.byteLength) {
     const chunk = buffer.slice(offset, offset + CHUNK_SIZE);
-    const chunkData = arrayBufferToBase64(chunk);
+
     broadcast(JSON.stringify({
       type: "FILE_CHUNK",
-      data: chunkData
+      fileId,
+      data: arrayBufferToBase64(chunk)
     }));
+
     offset += CHUNK_SIZE;
     document.getElementById("progress").value =
       Math.floor((offset / buffer.byteLength) * 100);
+
     await new Promise(r => setTimeout(r, 1));
   }
 
-  broadcast(JSON.stringify({ type: "FILE_END" }));
+  broadcast(JSON.stringify({
+    type: "FILE_END",
+    fileId
+  }));
+
+  document.getElementById("progress").value = 0;
 };
 
 function broadcast(data) {
