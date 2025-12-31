@@ -1,0 +1,17 @@
+# Dependencies
+node_modules
+
+# Build outputs
+dist
+dist-ssr
+
+# Vite
+.vite
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Misc
+*.local

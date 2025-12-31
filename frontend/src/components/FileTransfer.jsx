@@ -1,4 +1,6 @@
+
 import React, { useRef, useState } from 'react';
+import { showToast } from './ToastContainer';
 import './FileTransfer.css';
 
 /**
@@ -9,24 +11,44 @@ import './FileTransfer.css';
  */
 function FileTransfer({ onSendFile, incomingFiles = [], outgoingFiles = [] }) {
   const fileInputRef = useRef(null);
+  const [uploadingFiles, setUploadingFiles] = useState(new Set());
 
   const handleFileSelect = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (file.size > 20 * 1024 * 1024) {
-      alert('File too large (max 20 MB)');
+      showToast('❌ File too large! Maximum size: 20 MB', 'error');
       return;
     }
 
     try {
+      // Mark file as uploading (no toast yet)
+      setUploadingFiles(prev => new Set([...prev, file.name]));
+      
       await onSendFile(file);
+      
+      // Only show toast when COMPLETE
+      showToast(`Uploaded ${file.name}`, 'success', 3000);
+      
+      // Unmark file as uploading
+      setUploadingFiles(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(file.name);
+        return newSet;
+      });
+      
       // Reset input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
     } catch (error) {
-      alert(error.message || 'Failed to send file');
+      showToast(`❌ ${error.message || 'Failed to send file'}`, 'error');
+      setUploadingFiles(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(file.name);
+        return newSet;
+      });
     }
   };
 

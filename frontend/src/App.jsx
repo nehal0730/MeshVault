@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { browserAdapter } from './browserAdapter';
+import { browserAdapter } from './adapters/browserAdapter';
 import Identity from './components/Identity';
 import PeerList from './components/PeerList';
 import ChatWindow from './components/ChatWindow';
 import MessageInput from './components/MessageInput';
 import FileTransfer from './components/FileTransfer';
+import Monitoring from './components/Monitoring';
+import ToastContainer from './components/ToastContainer';
 import './App.css';
 
 /**
@@ -16,6 +18,7 @@ import './App.css';
 function App() {
   const [state, setState] = useState(() => browserAdapter.getState());
   const [isInitialized, setIsInitialized] = useState(false);
+  const [rightPanelTab, setRightPanelTab] = useState('files'); // 'files' or 'monitor'
 
   // Initialize adapter and set up state updates
   useEffect(() => {
@@ -30,16 +33,26 @@ function App() {
       state.isDarkMode ? 'dark' : 'light'
     );
 
+    // Mark as initialized after a short delay to let browser.js load
+    const initTimer = setTimeout(() => {
+      setIsInitialized(true);
+      console.log('✅ App initialized');
+    }, 500);
+
     // Poll for peer updates (since browser.js doesn't have events)
     const peerUpdateInterval = setInterval(() => {
       browserAdapter.updatePeerList();
       browserAdapter.syncIncomingFileProgress();
-    }, 1000);
+      // Trigger a state update to ensure monitoring dashboard gets fresh data
+      setState(prevState => ({ ...prevState }));
+    }, 500); // Increased polling frequency to 500ms for better monitoring
 
-    setIsInitialized(true);
-
+    // Cleanup on unmount
     return () => {
+      clearTimeout(initTimer);
       clearInterval(peerUpdateInterval);
+      // Note: Don't call browserAdapter.cleanup() here as it would clear state
+      // Only call on actual page unload
     };
   }, []);
 
@@ -125,18 +138,44 @@ function App() {
           />
         </main>
 
-        {/* File Transfer Panel */}
+        {/* File Transfer / Monitoring Panel with Tabs */}
         <aside className="app-files">
-          <FileTransfer
-            onSendFile={handleSendFile}
-            incomingFiles={state.incomingFiles}
-            outgoingFiles={state.outgoingFiles}
-          />
+          <div className="right-panel-tabs">
+            <button 
+              className={`tab-button ${rightPanelTab === 'files' ? 'active' : ''}`}
+              onClick={() => setRightPanelTab('files')}
+            >
+              📁 Files
+            </button>
+            <button 
+              className={`tab-button ${rightPanelTab === 'monitor' ? 'active' : ''}`}
+              onClick={() => setRightPanelTab('monitor')}
+            >
+              📊 Monitor
+            </button>
+          </div>
+          
+          <div className="right-panel-content">
+            {rightPanelTab === 'files' ? (
+              <FileTransfer
+                onSendFile={handleSendFile}
+                incomingFiles={state.incomingFiles}
+                outgoingFiles={state.outgoingFiles}
+              />
+            ) : (
+              <Monitoring
+                peers={state.peers}
+                messages={state.messages}
+              />
+            )}
+          </div>
         </aside>
       </div>
+
+      {/* Toast Notification Container */}
+      <ToastContainer />
     </div>
   );
 }
 
 export default App;
-

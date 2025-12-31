@@ -1,0 +1,13 @@
+{
+  "name": "meshvault-backend",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "node node-peer.js"
+  },
+  "description": "P2P WebRTC Mesh Chat Application - Backend Signaling",
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.18.3"
+  }
+}

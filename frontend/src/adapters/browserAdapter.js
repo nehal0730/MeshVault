@@ -1,12 +1,11 @@
-/**
- * Browser Adapter Layer
- * 
- * This module bridges browser.js (networking logic) with React UI.
- * It exposes state and callbacks for React components to use.
- */
-
 class BrowserAdapter {
   constructor() {
+    // Memory optimization constants
+    this.MAX_MESSAGE_HISTORY = Infinity;      // Keep ALL messages (disabled cleanup)
+    this.MESSAGE_CLEANUP_INTERVAL = 30000; // Cleanup every 30 seconds (disabled)
+    this.MAX_COMPLETED_FILES = Infinity;      // Keep ALL completed files (disabled cleanup)
+    this.SEEN_MESSAGE_CLEANUP_INTERVAL = 60000; // Clear old seenMessages every 60 seconds (disabled)
+    
     // State that React will subscribe to
     this.state = {
       peers: new Map(),           // peerId -> { username, lastSeen, status }
@@ -41,28 +40,79 @@ class BrowserAdapter {
     if (typeof window !== 'undefined') {
       // Override browser.js functions to hook into React
       this.hookIntoBrowserJS();
+      // Start memory cleanup routine
+      this.startMemoryCleanup();
     }
+  }
+
+  startMemoryCleanup() {
+    // Cleanup old messages periodically
+    setInterval(() => {
+      this.cleanupMessageHistory();
+    }, this.MESSAGE_CLEANUP_INTERVAL);
+
+    // Cleanup old seenMessages/seenFileIds periodically
+    setInterval(() => {
+      this.cleanupSeenTracking();
+    }, this.SEEN_MESSAGE_CLEANUP_INTERVAL);
+
+    // Cleanup completed files
+    setInterval(() => {
+      this.cleanupCompletedFiles();
+    }, 30000); // Every 30 seconds
+  }
+
+  cleanupMessageHistory() {
+    if (this.state.messages.length > this.MAX_MESSAGE_HISTORY) {
+      const removed = this.state.messages.length - this.MAX_MESSAGE_HISTORY;
+      this.state.messages = this.state.messages.slice(-this.MAX_MESSAGE_HISTORY);
+      console.log(`♻️ Cleaned up message history: removed ${removed} old messages, keeping last ${this.MAX_MESSAGE_HISTORY}`);
+      this.notifyUpdate();
+    }
+  }
+
+  cleanupSeenTracking() {
+    // Limit seenFileIds and seenFileSignatures to prevent unbounded growth
+    if (this.seenFileIds.size > this.MAX_COMPLETED_FILES) {
+      // Create a new Set with only the most recent files
+      const idsArray = Array.from(this.seenFileIds);
+      this.seenFileIds = new Set(idsArray.slice(-this.MAX_COMPLETED_FILES));
+      console.log(`♻️ Cleaned up seenFileIds: keeping last ${this.MAX_COMPLETED_FILES} file IDs`);
+    }
+
+    if (this.seenFileSignatures.size > this.MAX_COMPLETED_FILES) {
+      const sigArray = Array.from(this.seenFileSignatures);
+      this.seenFileSignatures = new Set(sigArray.slice(-this.MAX_COMPLETED_FILES));
+      console.log(`♻️ Cleaned up seenFileSignatures: keeping last ${this.MAX_COMPLETED_FILES} signatures`);
+    }
+  }
+
+  cleanupCompletedFiles() {
+    // DISABLED: Keep all files and messages permanently
+    // User explicitly requested not to remove any files or messages
+    // This allows users to see their complete file and chat history
+    return;
   }
 
   hookIntoBrowserJS() {
     // Wait for browser.js to fully initialize
     const checkBrowserJS = setInterval(() => {
-      // Check if browser.js functions exist (they're in global scope)
-      if (typeof window.handleChatMessage === 'function' || 
-          typeof window.renderPeers === 'function' ||
-          document.getElementById('peers') !== null) {
+      // Check if browser.js has exposed its critical variables
+      if (window.__meshVaultMyId && 
+          window.__meshVaultPeers && 
+          typeof window.handleDecryptedMessage === 'function') {
         clearInterval(checkBrowserJS);
-        
-        // Expose browser.js variables to window
-        // Since they're declared with const/let, we need to access them via eval
-        // or inject code to expose them
-        this.exposeBrowserJSVariables();
+        console.log('✅ browser.js detected as ready');
         this.setupHooks();
       }
     }, 100);
 
-    // Timeout after 5 seconds
-    setTimeout(() => clearInterval(checkBrowserJS), 5000);
+    // Timeout after 10 seconds
+    setTimeout(() => {
+      clearInterval(checkBrowserJS);
+      console.warn('⚠️ browser.js initialization timeout - proceeding anyway');
+      this.setupHooks();
+    }, 10000);
   }
 
   exposeBrowserJSVariables() {
@@ -180,24 +230,36 @@ class BrowserAdapter {
     const fileInput = document.getElementById("fileInput");
     if (fileInput) {
       const originalOnChange = fileInput.onchange;
+      // Remove the original onchange property so it isn't invoked twice
+      // (we will call it explicitly from our listener). This prevents
+      // duplicate file sends where browser.js would execute the handler
+      // once because we call it and again because it remained attached.
+      if (originalOnChange) {
+        fileInput.onchange = null;
+      }
+
       fileInput.addEventListener('change', async (e) => {
         const file = e.target.files?.[0];
         if (file && originalOnChange) {
-          // Generate a temporary ID for tracking (browser.js will use its own fileId for actual transfer)
           const tempId = crypto.randomUUID();
-          
-          // Track outgoing file in array (don't replace, add to array)
+
           const newOutgoingFile = {
             fileId: tempId,
             name: file.name,
             size: file.size,
             progress: 0
           };
-          
+
           this.state.outgoingFiles = [...this.state.outgoingFiles, newOutgoingFile];
           this.notifyUpdate();
-          
-          await originalOnChange(e);
+
+          // Call original handler once, preserving its `this` context
+          try {
+            await originalOnChange.call(fileInput, e);
+          } catch (err) {
+            console.error('Error in original fileInput onchange handler:', err);
+          }
+
           // Track progress for this specific file
           this.watchFileProgress(tempId);
         }
@@ -267,6 +329,21 @@ class BrowserAdapter {
     }
   }
 
+  // Get current monitoring stats
+  getMonitoringStats() {
+    return {
+      messagesCount: this.state.messages.length,
+      peersCount: this.state.peers.size,
+      connectedPeersCount: Array.from(this.state.peers.values()).filter(p => p.status === 'connected').length,
+      peerDetails: Array.from(this.state.peers.entries()).map(([peerId, peer]) => ({
+        peerId,
+        username: peer.username,
+        status: peer.status,
+        lastSeen: peer.lastSeen
+      }))
+    };
+  }
+
   // Handle incoming chat message
   handleMessage(msg) {
     if (!msg.id || !msg.text) {
@@ -298,7 +375,8 @@ class BrowserAdapter {
       text: msg.text,
       time: msg.time || Date.now(),
       username: username,
-      isOwn: msg.from === this.state.myPeerId
+      isOwn: msg.from === this.state.myPeerId,
+      status: 'delivered' // 'pending', 'sent', 'delivered', 'failed'
     };
 
     this.state.messages = [...this.state.messages, message];
@@ -451,18 +529,21 @@ class BrowserAdapter {
         updatedFiles[fileIndex] = {
           ...updatedFiles[fileIndex],
           progress: 100,
-          downloadUrl: entry.downloadUrl
+          downloadUrl: entry.downloadUrl,
+          completedTime: Date.now()
         };
       } else {
         updatedFiles[fileIndex] = {
           ...updatedFiles[fileIndex],
-          progress: 100
+          progress: 100,
+          completedTime: Date.now()
         };
       }
     } else {
       updatedFiles[fileIndex] = {
         ...updatedFiles[fileIndex],
-        progress: 100
+        progress: 100,
+        completedTime: Date.now()
       };
     }
     
@@ -538,7 +619,8 @@ class BrowserAdapter {
     const message = {
       ...msg,
       username: this.state.username || "You",
-      isOwn: true
+      isOwn: true,
+      status: 'pending' // Mark as pending until sent
     };
     this.state.messages = [...this.state.messages, message];
     this.notifyUpdate();
@@ -550,6 +632,15 @@ class BrowserAdapter {
       msgInput.value = text.trim();
       sendBtn.click();
       msgInput.value = "";
+
+      // Mark as sent after a brief delay
+      setTimeout(() => {
+        const messageIndex = this.state.messages.findIndex(m => m.id === msg.id);
+        if (messageIndex !== -1) {
+          this.state.messages[messageIndex].status = 'sent';
+          this.notifyUpdate();
+        }
+      }, 300);
     }
   }
 
@@ -609,8 +700,43 @@ class BrowserAdapter {
   getState() {
     return { ...this.state };
   }
+
+  // Cleanup memory leaks - called on unload or cleanup
+  cleanup() {
+    console.log('🧹 Cleaning up BrowserAdapter resources...');
+    
+    // Revoke all blob URLs to free up memory
+    for (const file of this.state.incomingFiles) {
+      if (file.downloadUrl) {
+        try {
+          URL.revokeObjectURL(file.downloadUrl);
+          console.log(`♻️ Revoked blob URL for ${file.name}`);
+        } catch (e) {
+          console.warn(`Error revoking blob URL for ${file.name}:`, e);
+        }
+      }
+    }
+    
+    // Clear all state
+    this.state.messages = [];
+    this.state.incomingFiles = [];
+    this.state.outgoingFiles = [];
+    this.state.peers = new Map();
+    
+    // Clear tracking sets
+    this.seenFileIds.clear();
+    this.seenFileSignatures.clear();
+    
+    console.log('✅ BrowserAdapter cleanup complete');
+  }
 }
 
 // Export singleton instance
 export const browserAdapter = new BrowserAdapter();
 
+// Cleanup on page unload to prevent memory leaks
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', () => {
+    browserAdapter.cleanup();
+  });
+}

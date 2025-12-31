@@ -1,6 +1,5 @@
 .file-transfer {
-  border-top: 1px solid var(--border-color);
-  background: var(--bg-secondary);
+  background: var(--bg-primary);
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -10,6 +9,7 @@
 .file-transfer-header {
   padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--border-color);
+  background: var(--bg-secondary);
 }
 
 .file-transfer-header h3 {
@@ -161,4 +161,3 @@
   font-size: 0.75rem;
   color: var(--text-secondary);
 }
-

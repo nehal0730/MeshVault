@@ -67,4 +67,3 @@ function MessageInput({ onSendMessage, disabled }) {
 }
 
 export default MessageInput;
-

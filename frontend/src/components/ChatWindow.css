@@ -96,6 +96,16 @@
   font-size: 0.7rem;
 }
 
+.message-status {
+  font-size: 0.8rem;
+  opacity: 0.8;
+  margin-left: auto;
+}
+
+.message-own .message-status {
+  color: var(--accent-text);
+}
+
 .message-text {
   word-wrap: break-word;
   line-height: 1.4;
@@ -126,4 +136,3 @@
 .chat-messages::-webkit-scrollbar-thumb:hover {
   background: var(--text-secondary);
 }
-

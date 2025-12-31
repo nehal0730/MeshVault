@@ -1,7 +1,7 @@
 {
-  "name": "meshvault",
+  "name": "meshvault-frontend",
   "version": "1.0.0",
-  "main": "browser.js",
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -10,7 +10,7 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "P2P WebRTC Mesh Chat Application",
+  "description": "P2P WebRTC Mesh Chat Application - Frontend",
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

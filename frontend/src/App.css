@@ -141,11 +141,18 @@ body {
   overflow: hidden;
 }
 
+/* allow flex children with overflow to shrink correctly */
+.app-main, .app-sidebar, .app-files {
+  min-height: 0;
+}
+
 /* Sidebar */
 .app-sidebar {
   width: 280px;
   display: flex;
   flex-direction: column;
+  flex: 0 0 280px;
+  min-height: 0;
   overflow: hidden;
   border-right: 1px solid var(--border-color);
   background: var(--bg-secondary);
@@ -162,12 +169,50 @@ body {
 
 /* File Transfer Panel */
 .app-files {
-  width: 300px;
+  width: 320px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   border-left: 1px solid var(--border-color);
   background: var(--bg-secondary);
+}
+
+.right-panel-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  padding: 0;
+  gap: 0;
+}
+
+.tab-button {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.tab-button:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.tab-button.active {
+  color: var(--accent-color);
+  border-bottom-color: var(--accent-color);
+  background: var(--bg-primary);
+}
+
+.right-panel-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 /* Responsive Design */
@@ -210,4 +255,3 @@ body {
     border-top: 1px solid var(--border-color);
   }
 }
-

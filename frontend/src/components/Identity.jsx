@@ -73,4 +73,3 @@ function Identity({ username, myPeerId, onUsernameChange }) {
 }
 
 export default Identity;
-

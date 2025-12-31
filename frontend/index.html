@@ -6,7 +6,7 @@
   <title>MeshVault - P2P WebRTC Mesh Chat</title>
   <!-- Hidden elements for browser.js compatibility -->
   <style>
-    #username, #saveIdentity, #peers, #msg, #send, #fileInput, #progress, #log {
+    #username, #saveIdentity, #peers, #msg, #send, #fileInput, #progress, #log, #toggleDisasterMode {
       display: none;
     }
   </style>
@@ -20,14 +20,13 @@
   <button id="send">Send</button>
   <input type="file" id="fileInput" />
   <progress id="progress" value="0" max="100"></progress>
+  <button id="toggleDisasterMode">Enable Disaster Mode</button>
   <pre id="log"></pre>
 
   <!-- React root -->
   <div id="root"></div>
 
-  <!-- Load browser.js first (networking logic) -->
-  <!-- browser.js now exposes variables to window.__meshVault* for React adapter -->
-  <script src="/browser.js"></script>
+  <script src="/src/browser.js"></script>
   
   <!-- React entry point - Vite will handle this -->
   <script type="module" src="/src/index.jsx"></script>

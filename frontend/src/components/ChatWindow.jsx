@@ -40,6 +40,16 @@ function ChatWindow({ messages, selectedPeer, username }) {
     }
   };
 
+  const getStatusIndicator = (status) => {
+    switch(status) {
+      case 'pending': return '⏳';
+      case 'sent': return '✓';
+      case 'delivered': return '✓✓';
+      case 'failed': return '❌';
+      default: return '';
+    }
+  };
+
   if (!selectedPeer && messages.length === 0) {
     return (
       <div className="chat-window">
@@ -65,6 +75,11 @@ function ChatWindow({ messages, selectedPeer, username }) {
             <div className="message-header">
               <span className="message-username">{msg.username}</span>
               <span className="message-time">{formatTime(msg.time)}</span>
+              {msg.isOwn && msg.status && (
+                <span className="message-status" title={msg.status}>
+                  {getStatusIndicator(msg.status)}
+                </span>
+              )}
             </div>
             <div className="message-text">{msg.text}</div>
           </div>
@@ -76,4 +91,3 @@ function ChatWindow({ messages, selectedPeer, username }) {
 }
 
 export default ChatWindow;
-

@@ -66,4 +66,3 @@ function PeerList({ peers, selectedPeer, onPeerSelect, myPeerId }) {
 }
 
 export default PeerList;
-

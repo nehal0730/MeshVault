@@ -1,6 +1,7 @@
 .identity {
   border-bottom: 1px solid var(--border-color);
   background: var(--bg-secondary);
+  flex: 0 0 auto; /* fixed height; let peer list take the remaining space */
 }
 
 .identity-header {
@@ -108,4 +109,3 @@
   color: var(--text-primary);
   word-break: break-all;
 }
-
