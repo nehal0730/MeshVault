@@ -109,7 +109,6 @@ function queueMessage(peerId, message) {
 
 const PEER_TIMEOUT = 7000;
 const RECONNECT_INTERVAL = 5000; // Try to reconnect to offline peers every 5s
-const MAX_RECONNECT_ATTEMPTS = 3; // Max reconnection attempts before giving up
 
 // Fixed key for testing (not E2EE)
 const fixedKeyData = new Uint8Array(32);
